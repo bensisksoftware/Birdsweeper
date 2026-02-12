@@ -30,26 +30,12 @@ internal void RenderWeirdGradient(int xOffset, int yOffset) {
     int pitch = width*bytesPerPixel;
     uint8 *Row = (uint8 *)BitmapMemory;
     for (int y = 0; y < BitmapHeight; ++y) {
-        uint8 *pixel = (uint8 *)Row;
+        uint32 *pixel = (uint32 *)Row;
         for (int x = 0; x < BitmapWidth; ++x) {
-            /*
-                             
-              BBGGRRxx
-                
-            */
-            // blue
-            *pixel = (uint8)x; 
-            ++pixel;
+            uint8 blue = (x + xOffset);
+            uint8 green = (y + yOffset);
             
-            *pixel = 0;
-            ++pixel;
-
-            *pixel = (uint16)y;
-            ++pixel;
-
-            *pixel = 0;
-            ++pixel;
-            
+            *pixel++ = ((green << 8) | blue);
         }
 
         Row += pitch;
@@ -79,9 +65,9 @@ internal void Win32ResizeDIBSection(int width, int height) {
     // TODO probably clear this to black
 }
 
-internal void Win32UpdateWindow(HDC DeviceContext, RECT *WindowRect, int x, int y, int width, int height) {
-    int WindowWidth = WindowRect->right - WindowRect->left;
-    int WindowHeight = WindowRect->bottom - WindowRect->top;
+internal void Win32UpdateWindow(HDC DeviceContext, RECT *ClientRect, int x, int y, int width, int height) {
+    int WindowWidth = ClientRect->right - ClientRect->left;
+    int WindowHeight = ClientRect->bottom - ClientRect->top;
     StretchDIBits(DeviceContext,
                   /*
                   x, y, width, height,
@@ -154,7 +140,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommmandLine, int Show
     WindowClass.lpszClassName = "BirdsweeperWindowClass";
 
     if(RegisterClass(&WindowClass)) {
-        HWND WindowHandle = CreateWindowExA(
+        HWND Window = CreateWindowExA(
             0,
             WindowClass.lpszClassName,
             "Birdsweeper",
@@ -167,11 +153,12 @@ WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommmandLine, int Show
             0,
             Instance,
             0);
-        if (WindowHandle) {
+        if (Window) {
+            int xOffset = 0;
+            int yOffset = 0;
+            
             running = true;
             while(running) {
-                int xOffset = 0;
-                int yOffset = 0;
                 MSG Message;
                 while(PeekMessage(&Message, 0, 0, 0, PM_REMOVE)) {
                     if (Message.message == WM_QUIT) {
@@ -183,6 +170,15 @@ WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommmandLine, int Show
                 }
 
                 RenderWeirdGradient(xOffset, yOffset);
+                
+                HDC DeviceContext = GetDC(Window);;
+                RECT ClientRect;
+                GetClientRect(Window, &ClientRect);
+                int WindowWidth = ClientRect.right - ClientRect.left;
+                int WindowHeight = ClientRect.bottom - ClientRect.top;
+                Win32UpdateWindow(DeviceContext, &ClientRect, 0, 0, WindowWidth, WindowHeight);
+                ReleaseDC(Window, DeviceContext);
+                
                 ++xOffset;
             }
         } else {
